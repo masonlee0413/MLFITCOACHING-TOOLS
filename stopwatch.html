@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rest Timer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #888;
+  }
+
+  .display {
+    font-size: 72px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    color: #111;
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+    line-height: 1;
+  }
+
+  .display .ms {
+    font-size: 40px;
+    color: #999;
+  }
+
+  .btns {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn {
+    padding: 10px 28px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #111;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 100px;
+    transition: background 0.12s, transform 0.1s;
+  }
+
+  .btn:hover { background: #f5f5f5; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn.primary {
+    background: #111;
+    color: #fff;
+    border-color: #111;
+  }
+
+  .btn.primary:hover { background: #333; }
+
+  .btn.stop {
+    background: #fff;
+    color: #d93025;
+    border-color: #d93025;
+  }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .laps {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .lap-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 14px;
+    border-radius: 8px;
+    background: #f7f7f7;
+    font-size: 14px;
+  }
+
+  .lap-label { color: #666; }
+
+  .lap-split {
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+    font-size: 13px;
+    color: #999;
+  }
+
+  .lap-total {
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+    font-weight: 500;
+    color: #111;
+  }
+
+  .empty {
+    font-size: 13px;
+    color: #bbb;
+    text-align: center;
+    padding: 6px 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="label">Rest Timer</p>
+
+  <div class="display">
+    <span id="mm">00</span>:<span id="ss">00</span><span class="ms">.<span id="ms">00</span></span>
+  </div>
+
+  <div class="btns">
+    <button class="btn" id="lapBtn" onclick="lap()" disabled>Lap</button>
+    <button class="btn primary" id="startBtn" onclick="toggle()">Start</button>
+    <button class="btn" id="resetBtn" onclick="reset()">Reset</button>
+  </div>
+
+  <div class="laps" id="laps">
+    <p class="empty">Laps will appear here</p>
+  </div>
+</div>
+
+<script>
+  let running = false, startTime = 0, elapsed = 0, raf = null;
+  let lapTimes = [], lastLapElapsed = 0;
+
+  function pad(n) { return String(Math.floor(n)).padStart(2, '0'); }
+
+  function render(e) {
+    const total = Math.floor(e / 10);
+    const ms = total % 100;
+    const secs = Math.floor(total / 100) % 60;
+    const mins = Math.floor(total / 6000);
+    document.getElementById('mm').textContent = pad(mins);
+    document.getElementById('ss').textContent = pad(secs);
+    document.getElementById('ms').textContent = pad(ms);
+  }
+
+  function tick() {
+    elapsed = Date.now() - startTime;
+    render(elapsed);
+    raf = requestAnimationFrame(tick);
+  }
+
+  function toggle() {
+    const btn = document.getElementById('startBtn');
+    const lapBtn = document.getElementById('lapBtn');
+    if (!running) {
+      startTime = Date.now() - elapsed;
+      running = true;
+      btn.textContent = 'Stop';
+      btn.className = 'btn stop';
+      lapBtn.disabled = false;
+      tick();
+    } else {
+      cancelAnimationFrame(raf);
+      running = false;
+      btn.textContent = 'Start';
+      btn.className = 'btn primary';
+      lapBtn.disabled = true;
+    }
+  }
+
+  function lap() {
+    if (!running) return;
+    const split = elapsed - lastLapElapsed;
+    lapTimes.unshift({ total: elapsed, split });
+    lastLapElapsed = elapsed;
+    renderLaps();
+  }
+
+  function reset() {
+    cancelAnimationFrame(raf);
+    running = false;
+    elapsed = 0;
+    lastLapElapsed = 0;
+    lapTimes = [];
+    render(0);
+    const btn = document.getElementById('startBtn');
+    btn.textContent = 'Start';
+    btn.className = 'btn primary';
+    document.getElementById('lapBtn').disabled = true;
+    renderLaps();
+  }
+
+  function fmtTime(e) {
+    const total = Math.floor(e / 10);
+    const ms = total % 100;
+    const secs = Math.floor(total / 100) % 60;
+    const mins = Math.floor(total / 6000);
+    return `${pad(mins)}:${pad(secs)}.${pad(ms)}`;
+  }
+
+  function renderLaps() {
+    const el = document.getElementById('laps');
+    if (lapTimes.length === 0) {
+      el.innerHTML = '<p class="empty">Laps will appear here</p>';
+      return;
+    }
+    el.innerHTML = lapTimes.map((l, i) => `
+      <div class="lap-row">
+        <span class="lap-label">Lap ${lapTimes.length - i}</span>
+        <span class="lap-split">+${fmtTime(l.split)}</span>
+        <span class="lap-total">${fmtTime(l.total)}</span>
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>
